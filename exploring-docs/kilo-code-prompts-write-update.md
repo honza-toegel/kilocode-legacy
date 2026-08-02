@@ -2,6 +2,11 @@
 
 Reconciled notes from analysis of extracted IntelliJ system prompts (`exploring-docs/system-prompts/`), the brainstorm in `exploring-docs/explore-brainstorm.md`, and the Kilo Code source tree. Focus: what can be improved via mode/prompt configuration vs what requires harness or infrastructure changes — especially for **GPT-5.1 on Azure** in a regulated Spring Boot / Maven environment.
 
+Companion extracts:
+
+- [`hard-coded-agent-constraints.md`](./hard-coded-agent-constraints.md) — code-only loop / tool / exploration / write limits
+- [`agentic-flow-observation.md`](./agentic-flow-observation.md) — how to read session JSON against that model
+
 ---
 
 ## Sources
@@ -11,6 +16,7 @@ Reconciled notes from analysis of extracted IntelliJ system prompts (`exploring-
 | `exploring-docs/system-prompts/code-mode.md` (and ask/architect/debug) | Runtime prompts exported from default IntelliJ install |
 | `exploring-docs/system-prompts/custom-modes-docs.md` | Custom mode / agent configuration reference |
 | `exploring-docs/explore-brainstorm.md` | Original ZKB concerns (chat-only edits, Maven deps) |
+| `exploring-docs/hard-coded-agent-constraints.md` | Precise harness constraints (not prompt-tunable) |
 | `packages/types/src/mode.ts` | Built-in mode definitions |
 | `src/core/prompts/system.ts` | Prompt assembly |
 | `src/core/prompts/tools/filter-tools-for-mode.ts` | Per-session tool filtering |
@@ -67,13 +73,13 @@ Precedence on slug collision: **organization → project → global → built-in
 
 1. **Completion is self-reported.** `OBJECTIVE` requires `attempt_completion` when done (`src/core/prompts/sections/objective.ts`). `AttemptCompletionTool` blocks only if a tool failed in the current turn — not if files were never edited.
 2. **Wrong mode.** Architect can edit only `.md`; Ask has no edit group. Chat-only code proposals in those modes are expected.
-3. **One tool per turn.** Prompt enforces exactly one tool call per response; multi-file work needs many round-trips. Models may describe remaining files and call `attempt_completion` early.
-4. **No tool call = no apply.** New tasks use **native tool calling only** (`src/utils/resolveToolProtocol.ts`). Prose in chat is not parsed into edits. After repeated no-tool turns → `MODEL_NO_TOOLS_USED` (`src/core/task/Task.ts`).
+3. **One tool per turn (prompt + runtime).** Prompt says exactly one tool per response; **runtime also hard-disables** multi/parallel tools (`parallelToolCallsEnabled = false`, `isMultipleNativeToolCallsEnabled = false` in `Task.ts` / `presentAssistantMessage.ts`). The `multipleNativeToolCalls` experiment may still appear in prompt text but **does not change execution**. Multi-file work needs many round-trips; models may describe remaining files and call `attempt_completion` early.
+4. **No tool call = no apply.** New tasks use **native tool calling only** (`src/utils/resolveToolProtocol.ts` ignores profile `toolProtocol`). Prose in chat is not parsed into edits. After repeated no-tool turns → injected `noToolsUsed` / mistake path (`Task.ts`, `responses.ts`).
 5. **Model / provider reliability.** GPT-5.1 on Azure must emit valid `tool_calls` JSON; failures are harness-level, not fixable by prompt alone.
 
 **Fixable via prompt/mode (partial):** strict Code-mode `customInstructions`, `.kilocode/rules/`, correct mode selection, optional `update_todo_list` tracking, raising consecutive mistake limit (default 3).
 
-**Not fixable via prompt alone:** native function-calling failures, no verification that all planned files were edited, no automatic “chat diff → apply” fallback.
+**Not fixable via prompt alone:** one-tool/parallel gate, native-only protocol, native function-calling failures, no verification that all planned files were edited, no automatic “chat diff → apply” fallback, list/search/read/index hard caps (see constraints doc).
 
 ### Symptom 2: Does not explore Maven / internal dependencies
 
@@ -268,6 +274,8 @@ User approval (unless auto-approve/yolo) sits between tool execution and disk wr
 | Concern | Prompt/mode helps? | Needs code/infra? |
 |---------|-------------------|-------------------|
 | Chat instead of file edits | **Partially** — strict Code rules, correct mode | **Yes** — completion verification, tool-call reliability |
+| One tool / no parallel tools | **No** — prompt already says one; runtime forces it | **Yes** — re-wire `Task.ts` / `presentAssistantMessage.ts` |
 | Unknown Maven/internal APIs | **Yes** — rules + `maven-deps-catalog` | **Yes** — native JAR/source resolution not in product |
+| Truncated exploration (list/search/read) | **Weakly** — ask for narrower queries | **Yes** for higher caps; see constraints doc |
 | Custom instruction vs built-in prompt | **Compatible** — no built-in edit required | Tune wording per model (GPT-5.1 → `apply_patch` / `edit_file`) |
 | “All edit tools available” | **No** — filtered by mode × model × Fast Apply | Document actual tool set per deployment |
