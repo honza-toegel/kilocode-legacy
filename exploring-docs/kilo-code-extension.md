@@ -10,14 +10,14 @@ The most useful extension point is MCP. In IntelliJ IDEA 2025.2 and later, JetBr
 
 Kilo normally discovers code through a combination of:
 
-1. A recursive workspace file listing included with the first task, capped by `maxWorkspaceFiles` (default 200).
+1. A recursive workspace file listing included with the first task, capped by `maxWorkspaceFiles` (default 200 — **this one is a setting**).
 2. `codebase_search`, when Kilo code indexing is enabled and ready.
-3. `search_files`, implemented with bundled ripgrep.
-4. `list_files` and `read_file`, including explicit line ranges.
+3. `search_files`, implemented with bundled ripgrep (**hard cap 300 results**, lines truncated at 500 chars — not a setting).
+4. `list_files` (**hard cap 200 files** — separate from `maxWorkspaceFiles`) and `read_file` (line/concurrency settings exist; **60% remaining-token budget** and **~80% context size gate** are hard-coded).
 5. `execute_command`, when the active mode permits commands.
 6. MCP tools and resources exposed by configured servers.
 
-The model decides which tool to call. There is no fixed exploration phase and no configuration that means "run exactly N discovery steps before editing."
+The model decides which tool to call. There is no fixed exploration phase and no configuration that means "run exactly N discovery steps before editing." The agentic loop also executes **at most one tool per assistant turn** (runtime hard-disabled for multi/parallel tools). Full extract: [`hard-coded-agent-constraints.md`](./hard-coded-agent-constraints.md).
 
 ### Built-in strengths
 
@@ -30,11 +30,11 @@ The model decides which tool to call. There is no fixed exploration phase and no
 ### Important limitations
 
 - `search_files` is text search. It does not resolve Java overloads, inheritance, generated members, dependency classes, Spring bean wiring, or dynamic dispatch.
-- Kilo's semantic index is based on workspace content, not IntelliJ's PSI/indexes or Maven classpath model.
+- Kilo's semantic index is based on workspace content, not IntelliJ's PSI/indexes or Maven classpath model. Indexing also skips files over **1 MB** and chunks ~**1000** characters (hard-coded).
 - `pom.xml` is readable, but Kilo does not independently resolve it into a searchable Java type graph.
 - IntelliJ External Libraries, attached source JARs, SDK classes, and library roots are not automatically part of Kilo's workspace search.
 - The JetBrains host normally presents `project.basePath` as Kilo's workspace, rather than every IntelliJ content/library root.
-- Search results do not automatically trigger a centered read around every hit. The model must request the relevant line range.
+- Search results do not automatically trigger a centered read around every hit. The model must request the relevant line range (and each read is another turn because of one-tool-per-message).
 - `codebase_search` has a strong built-in instruction to run first for unexplored areas when indexing is ready. Without an explicit rule, this can make it win over a more precise Java MCP tool.
 - Kilo cannot replace the implementation of `search_files` through configuration. A smarter discovery engine must be offered as another tool and selected by the model.
 
