@@ -1,0 +1,37 @@
+# Copy to .kilocode/deps-api.config.yml in your Maven project root
+# and adjust for your reactor.
+
+# Only direct (non-transitive) dependencies of each module
+directOnly: true
+
+# Cap per-artifact class extraction (protects huge JARs)
+maxClassesPerArtifact: 400
+
+# Empty = all reactor modules. Or list Maven module paths / artifactIds:
+# modules:
+#   - .
+#   - my-app
+#   - modules/core
+modules: []
+
+# Include filter (empty = allow all direct deps).
+# Match groupId:artifactId, artifactId, or glob-ish prefix* :
+# includeArtifacts:
+#   - org.springframework:*
+#   - org.springframework.boot:spring-boot
+includeArtifacts: []
+
+# Exclude filter (applied after include). Same pattern rules:
+# excludeArtifacts:
+#   - org.projectlombok:lombok
+#   - com.example:test-*
+excludeArtifacts:
+  - org.projectlombok:lombok
+  - org.junit.jupiter:*
+  - org.mockito:*
+  - org.assertj:*
+  - org.hamcrest:*
+  - net.bytebuddy:*
+
+# Output directory relative to project root
+outputDir: .kilocode/deps-api

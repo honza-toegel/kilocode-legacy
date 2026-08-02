@@ -1,0 +1,9 @@
+## Maven dependency API catalog
+
+Public signatures for selected Maven dependencies live in `.kilocode/deps-api/` (generated).
+
+- Search there before inventing Spring/library APIs.
+- Regenerate after dependency changes: `scripts/generate-deps-api.sh`
+- Config: `.kilocode/deps-api.config.yml`
+- Agent rule: `.kilocode/rules/maven-deps-api.md`
+- Do not put `.kilocode/deps-api/` in `.kilocodeignore`.
